@@ -1,3 +1,4 @@
+from contextlib import AsyncExitStack
 from typing import Optional
 
 from mcp import ClientSession
@@ -53,8 +54,7 @@ class StdioMCPClient(MCPClient):
         self.args = args or []
         self.env = env
 
-        self._stdio_context = None
-        self._session_context = None
+        self._exit_stack: Optional[AsyncExitStack] = None
 
     def _build_server_params(self) -> StdioServerParameters:
         if self.docker_image:
@@ -81,20 +81,31 @@ class StdioMCPClient(MCPClient):
         server_params = self._build_server_params()
         print(self._startup_message())
 
-        self._stdio_context = stdio_client(server_params)
-        read_stream, write_stream = await self._stdio_context.__aenter__()
+        # Drive both nested context managers through one AsyncExitStack so they
+        # are entered and unwound in the same task — otherwise teardown trips
+        # anyio's "cancel scope in a different task" error.
+        stack = AsyncExitStack()
+        try:
+            read_stream, write_stream = await stack.enter_async_context(
+                stdio_client(server_params)
+            )
+            self.session = await stack.enter_async_context(
+                ClientSession(read_stream, write_stream)
+            )
 
-        self._session_context = ClientSession(read_stream, write_stream)
-        self.session = await self._session_context.__aenter__()
+            print("Initializing MCP session...")
+            init_result = await self.session.initialize()
+            print(f"Capabilities: {init_result.model_dump_json(indent=2)}")
+        except BaseException:
+            await stack.aclose()
+            self.session = None
+            raise
 
-        print("Initializing MCP session...")
-        init_result = await self.session.initialize()
-        print(f"Capabilities: {init_result.model_dump_json(indent=2)}")
-
+        self._exit_stack = stack
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self._session_context:
-            await self._session_context.__aexit__(exc_type, exc_val, exc_tb)
-        if self._stdio_context:
-            await self._stdio_context.__aexit__(exc_type, exc_val, exc_tb)
+        if self._exit_stack:
+            await self._exit_stack.aclose()
+            self._exit_stack = None
+        self.session = None

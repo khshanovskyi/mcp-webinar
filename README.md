@@ -13,52 +13,9 @@ see exactly what MCP adds over hand-written tools — and how auth fits in.
 | 4 | MCP with API-key auth | `host/app_mcp_auth.py` (`AUTH="api_key"`) | `servers/api_key_mcp_server.py` |
 | 5 | MCP with OAuth (Keycloak) | `host/app_mcp_auth.py` (`AUTH="oauth"`) | `servers/oauth_mcp_server.py` |
 
-The agent always works against the **mock User Service** (search / read / create /
+The agent always works against the **[mock User Service](https://github.com/khshanovskyi/mock-user-service)** (search / read / create /
 update / delete users).
 
-## Architecture
-
-```
-commons/                 shared building blocks (no agent/MCP logic)
-  constants.py           endpoints, ports, API key, system prompt
-  user_service/          REST client + pydantic models for the mock service
-
-host/                    the agent (OpenAI tool-calling) and its apps
-  agent.py               ONE agent: takes list[BaseTool], streams, calls .execute()
-  chat.py                shared REPL used by every app
-  app_custom_tools.py    demo 1
-  app_mcp_no_auth.py     demos 2 & 3 (toggle TRANSPORT)
-  app_mcp_auth.py        demos 4 & 5 (toggle AUTH)
-  tools/
-    base.py              BaseTool: name/description/input_schema + .execute() + openai_schema
-    mcp_tool.py          McpTool wraps a server tool; load_mcp_tools() discovers them
-    users/               hand-written User Service tools (build_user_service_tools())
-  mcp_clients/
-    base.py              MCPClient: list_tools / call_tool / resources / prompts
-    http.py              HttpMCPClient(url, headers) — base for the auth clients
-    stdio.py             StdioMCPClient (local script or docker image)
-    auth/
-      api_key_mcp_client.py   ApiKeyMCPClient(HttpMCPClient) — adds X-API-Key
-      oauth_mcp_client.py     OauthMCPClient(HttpMCPClient) — PKCE + token refresh
-      _oauth_keycloak.py      OAuthTokenManager (browser PKCE flow)
-
-servers/                 the MCP servers
-  _server.py             the FastMCP instance + tools (shared by ALL servers)
-  http_server.py         demo 2  (:8000/mcp)
-  stdio_server.py        demo 3
-  api_key_mcp_server.py  demo 4  (:8007/mcp)
-  oauth_mcp_server.py    demo 5  (:8008/mcp)
-  auth/                  API-key and JWT (Keycloak) middlewares
-```
-
-The key idea: **a tool is anything with an `execute()` method and an OpenAI
-schema** (`BaseTool`). Hand-written `UserService*Tool`s and server-backed
-`McpTool`s are interchangeable, so the agent and the chat loop never change —
-only the list of tools handed to the agent does.
-
-The servers never duplicate tool logic: every entrypoint imports the single
-`mcp` instance from `servers/_server.py`; the auth servers just wrap it in a
-middleware.
 
 ## Setup
 
@@ -80,23 +37,102 @@ Run every command below from the **repository root**.
 python -m host.app_custom_tools
 ```
 
+---
+
 ### Demo 2 — MCP over HTTP
 ```bash
 python -m servers.http_server          # terminal 1
 python -m host.app_mcp_no_auth         # terminal 2  (TRANSPORT="http")
 ```
 
+---
+
 ### Demo 3 — MCP over stdio
 Set `TRANSPORT="stdio"` in `host/app_mcp_no_auth.py` (the server is spawned for you):
+
 ```bash
-python -m host.app_mcp_no_auth
+python -m host.app_mcp_no_auth         # choose "stdio" when prompted
 ```
+
+<details> 
+<summary><b>Connecting your STDIO MCP server to Claude Desktop</b></summary>
+
+This uses your `servers/stdio_server.py` entry point — simplest and most reliable for local development.
+
+### Step 1: Find the Claude Desktop config file
+
+| OS          | Path                                                              |
+|-------------|-------------------------------------------------------------------|
+| **macOS**   | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| **Windows** | `%APPDATA%\Claude\claude_desktop_config.json`                     |
+
+### Step 2: Edit the config
+
+Open the file (create it if it doesn't exist) and add your server:
+
+```json
+{
+  "mcpServers": {
+    "users-management": {
+      "command": "{ABSOLUTE_PATH}/mcp-webinar/.venv/bin/python",
+      "args": [
+        "{ABSOLUTE_PATH}/mcp-webinar/servers/stdio_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "{ABSOLUTE_PATH}/mcp-webinar"
+      }
+    }
+  }
+}
+```
+
+**Important notes:**
+
+- Don't forget to replace `{ABSOLUTE_PATH}` with the absolute path to the project on your local machine
+- Set `PYTHONPATH` to your project root so imports like `servers` and `commons` resolve correctly
+- If you're using a virtual environment, point to its Python binary:
+  ```json
+  "command": "/path/to/your/venv/bin/python"
+  ```
+  On Windows: `"C:\\Users\\you\\project\\.venv\\Scripts\\python.exe"`
+
+<details> 
+<summary><b>Sample how it is done on my Mac:</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "users-management": {
+      "command": "/Users/pavlokhshanovskyi/my-courses/mcp-webinar/.venv/bin/python",
+      "args": [
+        "/Users/pavlokhshanovskyi/my-courses/mcp-webinar/servers/stdio_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/pavlokhshanovskyi/my-courses/mcp-webinar"
+      }
+    }
+  }
+}
+```
+
+![claude_stdio.gif](claude_stdio.gif)
+</details>
+
+### Step 3: Restart Claude Desktop
+
+Fully quit and reopen Claude Desktop. While reopening, Claude can ask for access to the project. In the connectors section you will be able to find `users-management`.
+
+</details>
+
+---
 
 ### Demo 4 — MCP with API key
 ```bash
 python -m servers.api_key_mcp_server   # terminal 1
 python -m host.app_mcp_auth            # terminal 2  (AUTH="api_key")
 ```
+
+---
 
 ### Demo 5 — MCP with OAuth (Keycloak)
 ```bash

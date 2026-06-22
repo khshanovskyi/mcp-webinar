@@ -18,6 +18,36 @@ def print_tools(tools: list[BaseTool]) -> None:
         print(json.dumps(tool.openai_schema, indent=2))
 
 
+def print_prompts(prompts: list) -> None:
+    """Pretty-print the prompts advertised by the MCP server."""
+    print("\n=== Available Prompts ===")
+    if not prompts:
+        print("(none)")
+        return
+    for prompt in prompts:
+        print(prompt.model_dump_json(indent=2))
+
+
+def print_resources(resources: list) -> None:
+    """Pretty-print the resources advertised by the MCP server."""
+    print("\n=== Available Resources ===")
+    if not resources:
+        print("(none)")
+        return
+    for resource in resources:
+        print(resource.model_dump_json(indent=2))
+
+
+def print_server_capabilities(mcp_client: MCPClient) -> None:
+    """Pretty-print the capabilities negotiated with the MCP server."""
+    print("\n=== MCP Server Capabilities ===")
+    capabilities = mcp_client.session.get_server_capabilities() if mcp_client.session else None
+    if capabilities is None:
+        print("(unavailable)")
+        return
+    print(capabilities.model_dump_json(indent=2))
+
+
 async def run_chat_loop(agent: Agent, banner: str) -> None:
     """Interactive REPL shared by all demos.
 
@@ -51,8 +81,16 @@ async def run_mcp_agent(mcp_client: MCPClient, api_key: str, model: str, banner:
     """
     try:
         async with mcp_client:
+            print_server_capabilities(mcp_client)
+
             tools = await load_mcp_tools(mcp_client)
             print_tools(tools)
+
+            prompts = await mcp_client.get_prompts()
+            print_prompts(prompts)
+
+            resources = await mcp_client.get_resources()
+            print_resources(resources)
 
             agent = Agent(api_key=api_key, model=model, tools=tools)
             await run_chat_loop(agent, banner)
