@@ -1,0 +1,14 @@
+# Host (agent) + servers
+openai==2.24.0
+mcp==1.28.0
+
+# HTTP clients / servers
+httpx==0.28.1
+requests==2.32.5
+uvicorn==0.49.0
+starlette==1.3.1
+
+# OAuth (Keycloak) JWT validation on the server side
+python-jose[cryptography]>=3.3.0
+
+pydantic==2.12.5
