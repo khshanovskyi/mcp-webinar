@@ -19,14 +19,12 @@ from pathlib import Path
 
 from commons.constants import MCP_HTTP_URL, OPENAI_API_KEY, OPENAI_MODEL
 from host.chat import run_mcp_agent
-from host.mcp_clients.base import MCPClient
-from host.mcp_clients.http import HttpMCPClient
-from host.mcp_clients.stdio import StdioMCPClient
+from host.mcp_client import MCPClient, build_http, build_stdio
 
 
 def build_mcp_client(transport: str) -> MCPClient:
     if transport == "http":
-        return HttpMCPClient(mcp_server_url=MCP_HTTP_URL)
+        return build_http(MCP_HTTP_URL)
     if transport == "stdio":
         # The client launches the stdio server for us, using this same
         # interpreter so it shares our venv. The spawned process gets a minimal
@@ -35,7 +33,7 @@ def build_mcp_client(transport: str) -> MCPClient:
         # ModuleNotFoundError.
         project_root = Path(__file__).resolve().parent.parent
         env = {**os.environ, "PYTHONPATH": str(project_root)}
-        return StdioMCPClient(
+        return build_stdio(
             command=sys.executable,
             args=["-m", "servers.stdio_server"],
             env=env,

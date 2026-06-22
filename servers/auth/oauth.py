@@ -1,92 +1,30 @@
-import os
+"""Token verification for the OAuth (Keycloak) MCP server.
 
-import httpx
-from jose import jwt, JWTError
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+The MCP Authorization flow itself (discovery, metadata, the ``WWW-Authenticate``
+challenge) is handled by ``fastmcp``'s ``RemoteAuthProvider`` in
+``servers/oauth_mcp_server.py``. This module only customises how an incoming
+Bearer token is *authorized*.
 
-# ==================== CONFIGURATION ====================
+``fastmcp``'s ``JWTVerifier`` already validates the token's signature (against
+Keycloak's JWKS), issuer and expiry, and can enforce ``required_scopes``. The
+only wrinkle: it reads scopes from the standard ``scope`` claim, but Keycloak
+expresses access via **realm roles** (``realm_access.roles``), not scopes.
 
-KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://localhost:8089")
-KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "mcp-realm")
-REQUIRED_ROLE = os.getenv("MCP_REQUIRED_ROLE", "mcp-tools-access")
+``KeycloakRoleScopeVerifier`` bridges that gap by treating the user's realm
+roles as additional scopes — so ``required_scopes=["mcp-tools-access"]`` is
+satisfied iff the user has the matching realm role. ``mcp-user`` (granted the
+role) passes; ``no-access-user`` (no role) is rejected with a 401. No Keycloak
+realm changes are needed.
+"""
+from typing import Any
 
-ISSUER = f"{KEYCLOAK_URL}/realms/{KEYCLOAK_REALM}"
-JWKS_URL = f"{ISSUER}/protocol/openid-connect/certs"
-
-# ==================== JWKS CACHE ====================
-
-# Public keys are fetched once from Keycloak and cached in memory.
-# This avoids a round-trip to Keycloak on every MCP request.
-# Cache is invalidated on server restart; for production you'd add TTL-based refresh.
-_jwks_cache: dict | None = None
+from fastmcp.server.auth.providers.jwt import JWTVerifier
 
 
-async def _get_jwks() -> dict:
-    """Fetch and cache Keycloak public keys (JWKS)"""
-    global _jwks_cache
-    if _jwks_cache is None:
-        print(f"🔑 Fetching JWKS from {JWKS_URL}")
-        async with httpx.AsyncClient() as client:
-            response = await client.get(JWKS_URL)
-            response.raise_for_status()
-            _jwks_cache = response.json()
-        print("🔑 JWKS cached successfully")
-    return _jwks_cache
+class KeycloakRoleScopeVerifier(JWTVerifier):
+    """JWTVerifier that also counts Keycloak realm roles as scopes."""
 
-
-# ==================== MIDDLEWARE ====================
-
-class JWTAuthMiddleware(BaseHTTPMiddleware):
-    """
-    Starlette middleware that:
-      1. Extracts the Bearer token from the Authorization header
-      2. Validates JWT signature using Keycloak public keys (JWKS)
-      3. Verifies token issuer and expiry
-      4. Checks that the user has the required realm role
-    """
-
-    async def dispatch(self, request: Request, call_next):
-        auth_header = request.headers.get("Authorization", "")
-
-        # ── Step 1: Check header presence ──────────────────────────────
-        if not auth_header.startswith("Bearer "):
-            return JSONResponse(
-                {"error": "Unauthorized", "detail": "Missing or malformed Authorization header"},
-                status_code=401
-            )
-
-        token = auth_header.removeprefix("Bearer ")
-
-        # ── Step 2: Validate JWT signature + claims ─────────────────────
-        try:
-            jwks = await _get_jwks()
-            claims = jwt.decode(
-                token,
-                jwks,
-                algorithms=["RS256"],
-                issuer=ISSUER,
-                options={"verify_aud": False}  # audience check not needed for our setup
-            )
-        except JWTError as e:
-            return JSONResponse(
-                {"error": "Unauthorized", "detail": f"Invalid token: {e}"},
-                status_code=401
-            )
-
-        # ── Step 3: Check realm role ────────────────────────────────────
-        # Keycloak embeds roles in: claims["realm_access"]["roles"]
-        realm_roles: list[str] = claims.get("realm_access", {}).get("roles", [])
-
-        if REQUIRED_ROLE not in realm_roles:
-            return JSONResponse(
-                {
-                    "error": "Forbidden",
-                    "detail": f"Role '{REQUIRED_ROLE}' is required. User has roles: {realm_roles}"
-                },
-                status_code=403
-            )
-
-        print(f"✅ Authenticated: {claims.get('preferred_username')} | roles: {realm_roles}")
-        return await call_next(request)
+    def _extract_scopes(self, claims: dict[str, Any]) -> list[str]:
+        scopes = list(super()._extract_scopes(claims))
+        realm_roles = (claims.get("realm_access") or {}).get("roles") or []
+        return scopes + list(realm_roles)

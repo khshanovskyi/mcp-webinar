@@ -1,43 +1,39 @@
 from pathlib import Path
-from mcp.server.fastmcp import FastMCP
+
+from fastmcp import FastMCP
+from fastmcp.server.auth import AuthProvider
 
 from commons.user_service.client import UserServiceClient
 from commons.user_service.user_info import UserSearchRequest, UserCreate, UserUpdate
 
-mcp = FastMCP(
-    name="users-management-mcp-server",
-    stateless_http=True,
-)
 user_client = UserServiceClient()
 
-@mcp.tool()
+
+# ==================== MCP TOOLS ====================
+
 async def get_user_by_id(user_id: int) -> str:
     """Provides full user information by user_id"""
     return user_client.get_user(user_id)
 
-@mcp.tool()
 async def delete_user(user_id: int) -> str:
     """Deletes user by user_id"""
     return user_client.delete_user(user_id)
 
-@mcp.tool()
 async def search_user(search_user_request: UserSearchRequest) -> str:
     """Searches for users by name, surname, email and gender"""
     return user_client.search_users(**search_user_request.model_dump())
 
-@mcp.tool()
 async def add_user(user_create_model: UserCreate) -> str:
     """Adds new user into the system"""
     return user_client.add_user(user_create_model)
 
-@mcp.tool()
 async def update_user(user_id: int, user_update_model: UserUpdate) -> str:
     """Updates user by user_id"""
     return user_client.update_user(user_id, user_update_model)
 
+
 # ==================== MCP RESOURCES ====================
 
-@mcp.resource("users-management://flow-diagram", mime_type="image/png")
 async def get_flow_diagram() -> bytes:
     """The Users Management Service flow diagram as PNG image"""
 
@@ -50,7 +46,6 @@ async def get_flow_diagram() -> bytes:
         return f.read()
 
 
-@mcp.resource("users-management://service-description", mime_type="text/plain")
 async def get_service_description() -> str:
     """Text description of the Mock User Service"""
 
@@ -64,16 +59,15 @@ async def get_service_description() -> str:
 
 # ==================== MCP PROMPTS ====================
 
-@mcp.prompt()
 async def user_search_assistant_prompt() -> str:
     """Helps users formulate effective search queries"""
     return """
-You are helping users search through a dynamic user database. The database contains 
+You are helping users search through a dynamic user database. The database contains
 realistic synthetic user profiles with the following searchable fields:
 
 ## Available Search Parameters
 - **name**: First name (partial matching, case-insensitive)
-- **surname**: Last name (partial matching, case-insensitive)  
+- **surname**: Last name (partial matching, case-insensitive)
 - **email**: Email address (partial matching, case-insensitive)
 - **gender**: Exact match (male, female, other, prefer_not_to_say)
 
@@ -84,7 +78,7 @@ realistic synthetic user profiles with the following searchable fields:
 - Try common variations: "mike" vs "michael", "liz" vs "elizabeth"
 - Consider cultural name variations
 
-### For Email Searches  
+### For Email Searches
 - Search by domain: "gmail" for all Gmail users
 - Search by name patterns: "john" for emails containing john
 - Use company names to find business emails
@@ -101,7 +95,7 @@ realistic synthetic user profiles with the following searchable fields:
 ## Example Search Patterns
 ```
 "Find all Johns" → name="john"
-"Gmail users named Smith" → email="gmail" + surname="smith"  
+"Gmail users named Smith" → email="gmail" + surname="smith"
 "Female users with company emails" → gender="female" + email="company"
 "Users with Johnson surname" → surname="johnson"
 ```
@@ -113,20 +107,19 @@ realistic synthetic user profiles with the following searchable fields:
 4. Combine multiple criteria for precision
 5. Remember searches are case-insensitive
 
-When helping users search, suggest multiple search strategies and explain 
+When helping users search, suggest multiple search strategies and explain
 why certain approaches might be more effective for their goals.
 """
 
-@mcp.prompt()
 async def user_profile_creation_prompt() -> str:
     """Guides creation of realistic user profiles"""
     return """
-You are helping create realistic user profiles for the system. Follow these guidelines 
+You are helping create realistic user profiles for the system. Follow these guidelines
 to ensure data consistency and realism.
 
 ## Required Fields
 - **name**: 2-50 characters, letters only, culturally appropriate
-- **surname**: 2-50 characters, letters only  
+- **surname**: 2-50 characters, letters only
 - **email**: Valid format, must be unique in system
 - **about_me**: Rich, realistic biography (see guidelines below)
 
@@ -140,11 +133,11 @@ to ensure data consistency and realism.
 ## Address Guidelines
 Provide complete, realistic addresses:
 - **country**: Full country names
-- **city**: Actual city names  
+- **city**: Actual city names
 - **street**: Realistic street addresses
 - **flat_house**: Apartment/unit format (Apt 123, Unit 5B, Suite 200)
 
-## Credit Card Guidelines  
+## Credit Card Guidelines
 Generate realistic but non-functional card data:
 - **num**: 16 digits formatted as XXXX-XXXX-XXXX-XXXX
 - **cvv**: 3 digits (000-999)
@@ -158,7 +151,7 @@ Create engaging, realistic biographies that include:
 - Authentic voice and writing style
 - Cultural and demographic appropriateness
 
-### Interests & Hobbies  
+### Interests & Hobbies
 - 2-4 specific hobbies or activities
 - 1-3 broader interests or passion areas
 - 1-2 life goals or aspirations
@@ -166,7 +159,7 @@ Create engaging, realistic biographies that include:
 ### Biography Templates
 Use varied narrative structures:
 - "I'm a [trait] person who loves [hobbies]..."
-- "When I'm not working, you can find me [activity]..."  
+- "When I'm not working, you can find me [activity]..."
 - "Life is all about balance for me. I enjoy [interests]..."
 - "As someone who's [trait], I find great joy in [hobby]..."
 
@@ -185,8 +178,34 @@ Use varied narrative structures:
 
 When creating profiles, aim for diversity in:
 - Geographic representation
-- Age distribution  
+- Age distribution
 - Interest variety
 - Socioeconomic backgrounds
 - Cultural backgrounds
 """
+
+
+def create_mcp(auth: AuthProvider | None = None) -> FastMCP:
+    """Build a fully-configured Users-Management MCP server.
+
+    All transports (HTTP, stdio, API-key, OAuth) share the same tools,
+    resources and prompts — only the OAuth entry point passes an ``auth``
+    provider, which makes the server a spec-compliant OAuth Resource Server
+    (it then auto-serves ``/.well-known/oauth-protected-resource`` and the
+    ``WWW-Authenticate`` challenge).
+    """
+    mcp = FastMCP(name="users-management-mcp-server", auth=auth)
+
+    mcp.tool()(get_user_by_id)
+    mcp.tool()(delete_user)
+    mcp.tool()(search_user)
+    mcp.tool()(add_user)
+    mcp.tool()(update_user)
+
+    mcp.resource("users-management://flow-diagram", mime_type="image/png")(get_flow_diagram)
+    mcp.resource("users-management://service-description", mime_type="text/plain")(get_service_description)
+
+    mcp.prompt()(user_search_assistant_prompt)
+    mcp.prompt()(user_profile_creation_prompt)
+
+    return mcp

@@ -1,6 +1,6 @@
 from typing import Any
 
-from host.mcp_clients.base import MCPClient
+from host.mcp_clients.client import MCPClient
 from host.tools.base import BaseTool
 
 

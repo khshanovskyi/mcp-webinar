@@ -25,18 +25,17 @@ from commons.constants import (
     OPENAI_MODEL,
 )
 from host.chat import run_mcp_agent
-from host.mcp_clients.auth.api_key_mcp_client import ApiKeyMCPClient
-from host.mcp_clients.auth.oauth_mcp_client import OauthMCPClient
+from host.mcp_client import build_api_key, build_oauth
 
 # ── Choose the auth scheme for the demo ─────────────────────────────────────
-AUTH = "api_key"  # "api_key" or "oauth"
+AUTH = "oauth"  # "api_key" or "oauth"
 
 
 def build_mcp_client():
     if AUTH == "api_key":
-        return ApiKeyMCPClient(mcp_server_url=MCP_API_KEY_URL, api_key=MCP_API_KEY)
+        return build_api_key(MCP_API_KEY_URL, MCP_API_KEY)
     if AUTH == "oauth":
-        return OauthMCPClient(mcp_server_url=MCP_OAUTH_URL)
+        return build_oauth(MCP_OAUTH_URL)
     raise ValueError(f"Unknown AUTH: {AUTH!r}")
 
 

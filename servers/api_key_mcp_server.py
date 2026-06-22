@@ -4,10 +4,11 @@
 """
 import uvicorn
 
-from servers._server import mcp
+from servers._server import create_mcp
 from servers.auth.api_key_auth import APIKeyMiddleware
 
-app = mcp.streamable_http_app()
+mcp = create_mcp()
+app = mcp.http_app(path="/mcp", stateless_http=True)
 app.add_middleware(APIKeyMiddleware)
 
 if __name__ == "__main__":

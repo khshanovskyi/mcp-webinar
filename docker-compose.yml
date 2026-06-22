@@ -56,7 +56,7 @@ services:
     ports:
       - "8089:8089"
     volumes:
-      - ./_keycloak/mcp-realm-config.json:/opt/_keycloak/data/import/mcp-realm-config.json
+      - ./_keycloak/mcp-realm-config.json:/opt/keycloak/data/import/mcp-realm-config.json
       - _keycloak_data:/opt/keycloak/data
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8089/realms/mcp-realm || exit 1"]

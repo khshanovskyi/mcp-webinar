@@ -36,11 +36,13 @@
       "serviceAccountsEnabled": false,
       "protocol": "openid-connect",
       "redirectUris": [
-        "http://localhost:9999/*"
+        "http://localhost:9999/*",
+        "https://oauth.pstmn.io/v1/callback"
       ],
       "webOrigins": [
         "http://localhost:9999",
-        "http://localhost:8008"
+        "http://localhost:8008",
+        "https://oauth.pstmn.io"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"

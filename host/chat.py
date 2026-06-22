@@ -4,7 +4,7 @@ import httpx
 
 from commons.constants import DEFAULT_SYSTEM_PROMPT
 from host.agent import Agent
-from host.mcp_clients.base import MCPClient
+from host.mcp_client import MCPClient
 from host.models.message import Message
 from host.models.role import Role
 from host.tools.base import BaseTool
@@ -41,7 +41,7 @@ def print_resources(resources: list) -> None:
 def print_server_capabilities(mcp_client: MCPClient) -> None:
     """Pretty-print the capabilities negotiated with the MCP server."""
     print("\n=== MCP Server Capabilities ===")
-    capabilities = mcp_client.session.get_server_capabilities() if mcp_client.session else None
+    capabilities = mcp_client.capabilities
     if capabilities is None:
         print("(unavailable)")
         return
