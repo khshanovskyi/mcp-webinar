@@ -32,17 +32,18 @@ from host.mcp_client import build_api_key, build_oauth
 
 def build_mcp_client(auth: str):
     if auth == "api_key":
-        # GitHub connection with API Key
-        return build_api_key(
-            url=GITHUB_MCP_URL,
-            api_key=GITHUB_MCP_API_KEY,
-            header_name="Authorization"
-        )
+        # GitHub connection with API Key (PAT)
         # return build_api_key(
-        #     url=MCP_API_KEY_URL,
-        #     api_key=MCP_API_KEY,
+        #     url=GITHUB_MCP_URL,
+        #     api_key=GITHUB_MCP_API_KEY,
         #     header_name="Authorization"
         # )
+
+        # UMS connection with API Key
+        return build_api_key(
+            url=MCP_API_KEY_URL,
+            api_key=MCP_API_KEY,
+        )
     if auth == "oauth":
         return build_oauth(MCP_OAUTH_URL)
     raise ValueError(f"Unknown AUTH: {auth!r}")
