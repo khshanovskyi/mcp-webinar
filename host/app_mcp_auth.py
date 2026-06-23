@@ -23,28 +23,39 @@ from commons.constants import (
     MCP_OAUTH_URL,
     OPENAI_API_KEY,
     OPENAI_MODEL,
+    GITHUB_MCP_URL,
+    GITHUB_MCP_API_KEY,
 )
 from host.chat import run_mcp_agent
 from host.mcp_client import build_api_key, build_oauth
 
-# ── Choose the auth scheme for the demo ─────────────────────────────────────
-AUTH = "oauth"  # "api_key" or "oauth"
 
-
-def build_mcp_client():
-    if AUTH == "api_key":
-        return build_api_key(MCP_API_KEY_URL, MCP_API_KEY)
-    if AUTH == "oauth":
+def build_mcp_client(auth: str):
+    if auth == "api_key":
+        # GitHub connection with API Key
+        return build_api_key(
+            url=GITHUB_MCP_URL,
+            api_key=GITHUB_MCP_API_KEY,
+            header_name="Authorization"
+        )
+        # return build_api_key(
+        #     url=MCP_API_KEY_URL,
+        #     api_key=MCP_API_KEY,
+        #     header_name="Authorization"
+        # )
+    if auth == "oauth":
         return build_oauth(MCP_OAUTH_URL)
-    raise ValueError(f"Unknown AUTH: {AUTH!r}")
+    raise ValueError(f"Unknown AUTH: {auth!r}")
 
 
 async def main():
+    print("type `oauth` or `api_key` to choose MCP server Auth approach")
+    auth = input("\n> ").strip()
     await run_mcp_agent(
-        build_mcp_client(),
+        build_mcp_client(auth),
         api_key=OPENAI_API_KEY,
         model=OPENAI_MODEL,
-        banner=f"MCP ({AUTH}) agent is ready! Type your query or 'exit'.",
+        banner=f"MCP ({auth}) agent is ready! Type your query or 'exit'.",
     )
 
 

@@ -142,9 +142,9 @@ def build_docker(image: str, env: Optional[dict[str, str]] = None) -> MCPClient:
     )
 
 
-def build_api_key(url: str, api_key: str) -> MCPClient:
+def build_api_key(url: str, api_key: str, header_name: str = "X-API-Key") -> MCPClient:
     """HTTP client that authenticates with a static ``X-API-Key`` header."""
-    return MCPClient(Client(StreamableHttpTransport(url, headers={"X-API-Key": api_key})))
+    return MCPClient(Client(StreamableHttpTransport(url, headers={header_name: api_key})))
 
 
 def build_oauth(url: str, client_id: str = "mcp-client", callback_port: int = 9999) -> MCPClient:

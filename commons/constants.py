@@ -15,6 +15,10 @@ MCP_API_KEY_URL = os.getenv("MCP_API_KEY_URL", "http://localhost:8007/mcp")
 # Streamable-HTTP MCP server behind Keycloak OAuth (servers/oauth_mcp_server.py)
 MCP_OAUTH_URL = os.getenv("MCP_OAUTH_URL", "http://localhost:8008/mcp")
 
+# GitHub with API Key (PAT)
+GITHUB_MCP_URL="https://api.githubcopilot.com/mcp/"
+GITHUB_MCP_API_KEY=f"Bearer {os.getenv("GITHUB_MCP_KEY", "wrong")}"
+
 # Shared secret expected by the API-key server / sent by the API-key client.
 MCP_API_KEY = os.getenv("MCP_API_KEY", "dev-secret-key")
 

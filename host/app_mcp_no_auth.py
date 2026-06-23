@@ -1,16 +1,4 @@
 """Demos 2 & 3 — Agent with MCP tools, no auth.
-
-The exact same agent, but the tools now come from an MCP server instead of
-being hand-written. Flip ``TRANSPORT`` to switch between:
-
-  * "http"  — Streamable HTTP server (Demo 2). Start it first:
-                python -m servers.http_server
-  * "stdio" — stdio server (Demo 3). The client spawns it automatically.
-
-Run:
-    docker compose up -d userservice
-    export OPENAI_API_KEY=sk-...
-    python -m host.app_mcp_no_auth
 """
 import asyncio
 import os

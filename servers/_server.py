@@ -7,26 +7,32 @@ from commons.user_service.client import UserServiceClient
 from commons.user_service.user_info import UserSearchRequest, UserCreate, UserUpdate
 
 user_client = UserServiceClient()
+mcp = FastMCP(name="users-management-mcp-server")
 
 
 # ==================== MCP TOOLS ====================
 
+@mcp.tool()
 async def get_user_by_id(user_id: int) -> str:
     """Provides full user information by user_id"""
     return user_client.get_user(user_id)
 
+@mcp.tool()
 async def delete_user(user_id: int) -> str:
     """Deletes user by user_id"""
     return user_client.delete_user(user_id)
 
+@mcp.tool()
 async def search_user(search_user_request: UserSearchRequest) -> str:
     """Searches for users by name, surname, email and gender"""
     return user_client.search_users(**search_user_request.model_dump())
 
+@mcp.tool()
 async def add_user(user_create_model: UserCreate) -> str:
     """Adds new user into the system"""
     return user_client.add_user(user_create_model)
 
+@mcp.tool()
 async def update_user(user_id: int, user_update_model: UserUpdate) -> str:
     """Updates user by user_id"""
     return user_client.update_user(user_id, user_update_model)
@@ -34,6 +40,7 @@ async def update_user(user_id: int, user_update_model: UserUpdate) -> str:
 
 # ==================== MCP RESOURCES ====================
 
+@mcp.resource("users-management://flow-diagram", mime_type="image/png")
 async def get_flow_diagram() -> bytes:
     """The Users Management Service flow diagram as PNG image"""
 
@@ -45,7 +52,7 @@ async def get_flow_diagram() -> bytes:
     with open(image_path, "rb") as f:
         return f.read()
 
-
+@mcp.resource("users-management://service-description", mime_type="text/plain")
 async def get_service_description() -> str:
     """Text description of the Mock User Service"""
 
@@ -59,6 +66,7 @@ async def get_service_description() -> str:
 
 # ==================== MCP PROMPTS ====================
 
+@mcp.prompt()
 async def user_search_assistant_prompt() -> str:
     """Helps users formulate effective search queries"""
     return """
@@ -111,6 +119,7 @@ When helping users search, suggest multiple search strategies and explain
 why certain approaches might be more effective for their goals.
 """
 
+@mcp.prompt()
 async def user_profile_creation_prompt() -> str:
     """Guides creation of realistic user profiles"""
     return """
@@ -186,26 +195,5 @@ When creating profiles, aim for diversity in:
 
 
 def create_mcp(auth: AuthProvider | None = None) -> FastMCP:
-    """Build a fully-configured Users-Management MCP server.
-
-    All transports (HTTP, stdio, API-key, OAuth) share the same tools,
-    resources and prompts — only the OAuth entry point passes an ``auth``
-    provider, which makes the server a spec-compliant OAuth Resource Server
-    (it then auto-serves ``/.well-known/oauth-protected-resource`` and the
-    ``WWW-Authenticate`` challenge).
-    """
-    mcp = FastMCP(name="users-management-mcp-server", auth=auth)
-
-    mcp.tool()(get_user_by_id)
-    mcp.tool()(delete_user)
-    mcp.tool()(search_user)
-    mcp.tool()(add_user)
-    mcp.tool()(update_user)
-
-    mcp.resource("users-management://flow-diagram", mime_type="image/png")(get_flow_diagram)
-    mcp.resource("users-management://service-description", mime_type="text/plain")(get_service_description)
-
-    mcp.prompt()(user_search_assistant_prompt)
-    mcp.prompt()(user_profile_creation_prompt)
-
+    mcp.auth=auth
     return mcp

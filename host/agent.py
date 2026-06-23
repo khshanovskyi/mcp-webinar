@@ -9,14 +9,6 @@ from host.tools.base import BaseTool
 
 
 class Agent:
-    """A single, transport-agnostic agent driven by OpenAI tool calling.
-
-    The agent does not care where a tool comes from: every tool is a
-    ``BaseTool`` with a ``.execute()`` method. The same agent powers all five
-    webinar demos — hand-written User Service tools, MCP-over-HTTP,
-    MCP-over-stdio, MCP behind an API key, and MCP behind OAuth — simply by
-    being handed a different list of tools.
-    """
 
     def __init__(self, api_key: str, model: str, tools: list[BaseTool]):
         self.model = model
